@@ -2,7 +2,6 @@ package com.ctrip.framework.traffic.netty.client;
 
 import com.ctrip.framework.traffic.netty.protocol.request.MessageRequestPacket;
 import com.ctrip.framework.traffic.netty.protocol.response.MessageResponsePacket;
-import com.ctrip.framework.traffic.utils.OsUtils;
 import com.ctrip.framework.traffic.utils.ThreadUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -34,10 +33,12 @@ public class MessageImpl implements Message {
     private ScheduledExecutorService sendScheduledExecutor;
     private ExecutorService receivedExecutor;
 
+    private int clientId;
     private int period;
     private double roundCount;
 
-    public MessageImpl(int bandWidth, int period) {
+    public MessageImpl(int bandWidth, int period, int clientId) {
+        this.clientId = clientId;
         if (period / 100 > 0 && period / 100 <= 10) {
             this.period = period / 100 * 100;
         } else {
@@ -47,17 +48,17 @@ public class MessageImpl implements Message {
         this.roundCount = Math.pow(2, 20) / Math.pow(2, 16) / round;
         if (bandWidth > 0 && bandWidth <= 1000) {
             roundCount = roundCount * bandWidth;
-            logger.info("[client] bandWidth size: {}Mbps, roundCount: {}, period: {}", bandWidth, roundCount, this.period);
+            logger.info("[client][{}] bandWidth size: {}Mbps, roundCount: {}, period: {}", clientId, bandWidth, roundCount, this.period);
         } else {
-            logger.info("[client] invalid bandWidth size: {}Mbps, use 1Mbps, roundCount: {}, period: {}", bandWidth, roundCount, this.period);
+            logger.info("[client][{}] invalid bandWidth size: {}Mbps, use 1Mbps, roundCount: {}, period: {}", clientId, bandWidth, roundCount, this.period);
         }
     }
 
     @Override
     public void start() {
         sendScheduledExecutor = ThreadUtils.newSingleThreadScheduledExecutor("sender");
-        receivedExecutor = ThreadUtils.newFixedThreadPool(OsUtils.getCpuCount(), "receiver");
-        logger.info("[client] start, send bits size: {}, roundCount: {}, period: {}", _8KB.getBytes().length * 8, roundCount, period);
+        receivedExecutor = ThreadUtils.newSingleThreadScheduledExecutor("receiver");
+        logger.info("[client][{}] start, send bits size: {}, roundCount: {}, period: {}", clientId, _8KB.getBytes().length * 8, roundCount, period);
         for (int i = 0; i < roundCount; i++) {
             MessageRequestPacket request = new MessageRequestPacket(i, _8KB);
             Entity entity = new Entity(true, 0);
@@ -76,19 +77,19 @@ public class MessageImpl implements Message {
                     int seq = request.getSeq();
                     Entity entity = receivedMap.get(seq);
                     if (!entity.isReceived()) {
-                        logger.debug("[client] seq: {} not received", seq);
+                        logger.debug("[client][{}] seq: {} not received", clientId, seq);
                         continue;
                     }
                     sendCount++;
-                    logger.debug("[client] seq: {} has received", seq);
+                    logger.debug("[client][{}] seq: {} has received", clientId, seq);
                     entity.setReceived(false);
                     entity.setSendTime(System.currentTimeMillis());
                     channel.writeAndFlush(request);
                 } catch (Exception e) {
-                    logger.warn("[client] received error", e);
+                    logger.warn("[client][{}] received error", clientId, e);
                 }
             }
-            logger.info("[client] send cost: {} ms, count: {}", System.currentTimeMillis() - start, sendCount);
+            logger.info("[client][{}] send cost: {} ms, count: {}", clientId, System.currentTimeMillis() - start, sendCount);
         }, INIT, period, TimeUnit.MILLISECONDS);
     }
 
@@ -99,7 +100,7 @@ public class MessageImpl implements Message {
             Entity entity = receivedMap.get(seq);
             entity.setReceived(true);
             long delayTime = System.currentTimeMillis() - entity.getSendTime();
-            delay.info("delay time is: {}ms", delayTime);
+            delay.info("[{}]delay: {}ms", clientId, delayTime);
         });
     }
 

@@ -25,8 +25,8 @@ public class MessageResponseHandler extends SimpleChannelInboundHandler<MessageR
 
     private boolean sendStarted;
 
-    public MessageResponseHandler(int bandWidth, int period) {
-        message = new MessageImpl(bandWidth, period);
+    public MessageResponseHandler(int bandWidth, int period, int clientId) {
+        message = new MessageImpl(bandWidth, period, clientId);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class MessageResponseHandler extends SimpleChannelInboundHandler<MessageR
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MessageResponsePacket messageResponsePacket) {
-        logger.info("[client] received seq: {}", messageResponsePacket.getSeq());
+        logger.debug("[client] received seq: {}", messageResponsePacket.getSeq());
         message.receive(messageResponsePacket);
         if (!sendStarted) {
             sendStarted = true;

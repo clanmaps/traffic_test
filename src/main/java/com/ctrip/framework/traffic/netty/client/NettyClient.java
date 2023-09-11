@@ -33,6 +33,7 @@ public class NettyClient {
     private int port;
     private int bandWidth;
     private int period;
+    private int clientId;
 
     public NettyClient(ClientVO clientVO) {
         this.host = clientVO.getServerHost();
@@ -41,7 +42,8 @@ public class NettyClient {
         this.period = clientVO.getPeriod();
     }
 
-    public void start() {
+    public void start(int clientId) {
+        this.clientId = clientId;
         NioEventLoopGroup workerGroup = new NioEventLoopGroup();
 
         bootstrap = new Bootstrap();
@@ -56,7 +58,7 @@ public class NettyClient {
                         ch.pipeline().addLast(new Splitter());
                         ch.pipeline().addLast(new PacketDecoder());
                         ch.pipeline().addLast(new IdleStateHandler(5, 0, 0));
-                        ch.pipeline().addLast(new MessageResponseHandler(bandWidth, period));
+                        ch.pipeline().addLast(new MessageResponseHandler(bandWidth, period, clientId));
                         ch.pipeline().addLast(new PacketEncoder());
                     }
                 });
@@ -64,12 +66,12 @@ public class NettyClient {
     }
 
     public void connect() {
-        logger.info("[client] connect start, host: {}, port: {} ......", host, port);
+        logger.info("[client][{}] connect start, host: {}, port: {} ......", clientId, host, port);
         ChannelFuture channelFuture = bootstrap.connect(host, port).addListener(future -> {
             if (future.isSuccess()) {
-                logger.info("[client] connect success, host: {}, port: {} ......", host, port);
+                logger.info("[client][{}] connect success, host: {}, port: {} ......", clientId, host, port);
             } else {
-                logger.info("[client] connect retry, host: {}, port: {} ......", host, port);
+                logger.info("[client][{}] connect retry, host: {}, port: {} ......", clientId, host, port);
                 bootstrap.config().group().schedule(this::connect, 2, TimeUnit.SECONDS);
             }
         });

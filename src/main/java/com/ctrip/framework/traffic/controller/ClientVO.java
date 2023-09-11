@@ -9,6 +9,7 @@ public class ClientVO {
     private int serverPort;
     private int bandWidth;
     private int period;
+    private int parallel = 1;
 
     public String getServerHost() {
         return serverHost;
@@ -42,6 +43,14 @@ public class ClientVO {
         this.period = period;
     }
 
+    public int getParallel() {
+        return parallel;
+    }
+
+    public void setParallel(int parallel) {
+        this.parallel = parallel;
+    }
+
     @Override
     public String toString() {
         return "ClientVO{" +
@@ -49,6 +58,7 @@ public class ClientVO {
                 ", serverPort=" + serverPort +
                 ", bandWidth=" + bandWidth +
                 ", period=" + period +
+                ", parallel=" + parallel +
                 '}';
     }
 }
