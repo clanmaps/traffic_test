@@ -27,7 +27,7 @@ public class MessageImpl implements Message {
     private static final String _4B = "abcd";
     //one mysql rows_event max size is 8KB(2^10 * 2^6)
     private static final String _8KB = _4B.repeat((int) (Math.pow(2, 10) * 2));
-    private static final int INIT = 10 * 1000;
+    private static final int INIT = 2 * 1000;
 
     private List<MessageRequestPacket> requests = Lists.newArrayList();
     private Map<Integer, Entity> receivedMap = Maps.newConcurrentMap();
@@ -57,7 +57,7 @@ public class MessageImpl implements Message {
     public void start() {
         sendScheduledExecutor = ThreadUtils.newSingleThreadScheduledExecutor("sender");
         receivedExecutor = ThreadUtils.newFixedThreadPool(OsUtils.getCpuCount(), "receiver");
-        logger.info("[client] send bits size: {}, roundCount: {}, period: {}", _8KB.getBytes().length * 8, roundCount, period);
+        logger.info("[client] start, send bits size: {}, roundCount: {}, period: {}", _8KB.getBytes().length * 8, roundCount, period);
         for (int i = 0; i < roundCount; i++) {
             MessageRequestPacket request = new MessageRequestPacket(i, _8KB);
             Entity entity = new Entity(true, 0);
@@ -76,11 +76,11 @@ public class MessageImpl implements Message {
                     int seq = request.getSeq();
                     Entity entity = receivedMap.get(seq);
                     if (!entity.isReceived()) {
-                        logger.warn("[client] seq: {} not received", seq);
+                        logger.debug("[client] seq: {} not received", seq);
                         continue;
                     }
                     sendCount++;
-                    logger.info("[client] seq: {} has received", seq);
+                    logger.debug("[client] seq: {} has received", seq);
                     entity.setReceived(false);
                     entity.setSendTime(System.currentTimeMillis());
                     channel.writeAndFlush(request);
@@ -105,7 +105,15 @@ public class MessageImpl implements Message {
 
     @Override
     public void stop() {
+        if (sendScheduledExecutor != null) {
+            sendScheduledExecutor.shutdownNow();
+            sendScheduledExecutor = null;
+        }
 
+        if (receivedExecutor != null) {
+            receivedExecutor.shutdownNow();
+            receivedExecutor = null;
+        }
     }
 
     private static class Entity {

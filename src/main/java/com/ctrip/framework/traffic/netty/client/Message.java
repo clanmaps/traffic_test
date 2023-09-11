@@ -1,6 +1,5 @@
 package com.ctrip.framework.traffic.netty.client;
 
-import com.ctrip.framework.traffic.netty.protocol.request.MessageRequestPacket;
 import com.ctrip.framework.traffic.netty.protocol.response.MessageResponsePacket;
 import io.netty.channel.Channel;
 
