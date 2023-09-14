@@ -77,8 +77,8 @@ public class ClientVO {
             throw new Exception("client period should in [100, 1000] milliseconds and a multiple of 100");
         }
 
-        if (parallel < 1 || parallel > 1000) {
-            throw new Exception("client parallel should in [1, 1000]");
+        if (parallel < 1 || parallel > 500) {
+            throw new Exception("client parallel should in [1, 500]");
         }
 
         if (omit < 0 || omit > 600) {
