@@ -27,23 +27,22 @@ public class NettyClient {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     public static final AttributeKey<NettyClient> CLIENT_KEY = AttributeKey.valueOf("client");
 
-
     private Bootstrap bootstrap;
-    private String host;
-    private int port;
-    private int bandWidth;
-    private int period;
+
+    private ClientVO clientVO;
+    private String serverHost;
+    private int serverPort;
+
     private int clientId;
 
-    public NettyClient(ClientVO clientVO) {
-        this.host = clientVO.getServerHost();
-        this.port = clientVO.getServerPort();
-        this.bandWidth = clientVO.getBandWidth();
-        this.period = clientVO.getPeriod();
+    public NettyClient(ClientVO clientVO, int clientId) {
+        this.clientVO = clientVO;
+        this.serverHost = clientVO.getServerHost();
+        this.serverPort = clientVO.getServerPort();
+        this.clientId = clientId;
     }
 
-    public void start(int clientId) {
-        this.clientId = clientId;
+    public void start() {
         NioEventLoopGroup workerGroup = new NioEventLoopGroup();
 
         bootstrap = new Bootstrap();
@@ -57,8 +56,8 @@ public class NettyClient {
                     public void initChannel(SocketChannel ch) {
                         ch.pipeline().addLast(new Splitter());
                         ch.pipeline().addLast(new PacketDecoder());
-                        ch.pipeline().addLast(new IdleStateHandler(5, 0, 0));
-                        ch.pipeline().addLast(new MessageResponseHandler(bandWidth, period, clientId));
+                        ch.pipeline().addLast(new IdleStateHandler(10, 0, 0));
+                        ch.pipeline().addLast(new MessageResponseHandler(clientVO, clientId));
                         ch.pipeline().addLast(new PacketEncoder());
                     }
                 });
@@ -66,12 +65,12 @@ public class NettyClient {
     }
 
     public void connect() {
-        logger.info("[client][{}] connect start, host: {}, port: {} ......", clientId, host, port);
-        ChannelFuture channelFuture = bootstrap.connect(host, port).addListener(future -> {
+        logger.info("[client][{}] connect start, host: {}, port: {} ......", clientId, serverHost, serverPort);
+        ChannelFuture channelFuture = bootstrap.connect(serverHost, serverPort).addListener(future -> {
             if (future.isSuccess()) {
-                logger.info("[client][{}] connect success, host: {}, port: {} ......", clientId, host, port);
+                logger.info("[client][{}] connect success, host: {}, port: {} ......", clientId, serverHost, serverPort);
             } else {
-                logger.info("[client][{}] connect retry, host: {}, port: {} ......", clientId, host, port);
+                logger.info("[client][{}] connect retry, host: {}, port: {} ......", clientId, serverHost, serverPort);
                 bootstrap.config().group().schedule(this::connect, 2, TimeUnit.SECONDS);
             }
         });

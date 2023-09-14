@@ -1,5 +1,6 @@
 package com.ctrip.framework.traffic.netty.client.handler;
 
+import com.ctrip.framework.traffic.controller.ClientVO;
 import com.ctrip.framework.traffic.netty.client.Message;
 import com.ctrip.framework.traffic.netty.client.MessageImpl;
 import com.ctrip.framework.traffic.netty.client.NettyClient;
@@ -25,8 +26,8 @@ public class MessageResponseHandler extends SimpleChannelInboundHandler<MessageR
 
     private boolean sendStarted;
 
-    public MessageResponseHandler(int bandWidth, int period, int clientId) {
-        message = new MessageImpl(bandWidth, period, clientId);
+    public MessageResponseHandler(ClientVO clientVO, int clientId) {
+        message = new MessageImpl(clientVO, clientId);
     }
 
     @Override

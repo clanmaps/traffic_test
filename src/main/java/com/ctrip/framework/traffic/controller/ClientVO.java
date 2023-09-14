@@ -7,9 +7,18 @@ public class ClientVO {
 
     private String serverHost;
     private int serverPort;
-    private int bandWidth;
-    private int period;
+
+    //default bandwidth is 1 Mbps
+    private int bandWidth = 1;
+
+    //default send date period is 200 milliseconds
+    private int period = 200;
+
+    //default netty client number is 1
     private int parallel = 1;
+
+    //default warm up time is 60 seconds
+    private int omit = 60;
 
     public String getServerHost() {
         return serverHost;
@@ -51,6 +60,32 @@ public class ClientVO {
         this.parallel = parallel;
     }
 
+    public int getOmit() {
+        return omit;
+    }
+
+    public void setOmit(int omit) {
+        this.omit = omit;
+    }
+
+    public void check() throws Exception {
+        if (bandWidth < 1 || bandWidth > 1000) {
+            throw new Exception("client bandWidth should in [1, 1000] Mbps");
+        }
+
+        if (period < 100 || period > 1000 || period % 100 != 0) {
+            throw new Exception("client period should in [100, 1000] milliseconds and a multiple of 100");
+        }
+
+        if (parallel < 1 || parallel > 1000) {
+            throw new Exception("client parallel should in [1, 1000]");
+        }
+
+        if (omit < 0 || omit > 600) {
+            throw new Exception("client warm up to omit should in [0, 600] seconds");
+        }
+    }
+
     @Override
     public String toString() {
         return "ClientVO{" +
@@ -59,6 +94,7 @@ public class ClientVO {
                 ", bandWidth=" + bandWidth +
                 ", period=" + period +
                 ", parallel=" + parallel +
+                ", omit=" + omit +
                 '}';
     }
 }

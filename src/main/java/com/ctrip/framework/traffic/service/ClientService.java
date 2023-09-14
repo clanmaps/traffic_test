@@ -21,21 +21,17 @@ public class ClientService {
             throw new Exception("client is working");
         }
 
-        int parallel = clientVO.getParallel();
-        logger.info("[client] start parallel {} ......", parallel);
-        if (parallel < 0 || parallel > 1000) {
-            throw new Exception("parallel should more then 0 and less then 1000");
-        }
+        clientVO.check();
 
-        for (int i = 0; i < parallel; i++) {
+        for (int i = 0; i < clientVO.getParallel(); i++) {
             start(clientVO, i);
         }
         worked = true;
     }
 
     private void start(ClientVO clientVO, int clientId) {
-        NettyClient client = new NettyClient(clientVO);
+        NettyClient client = new NettyClient(clientVO, clientId);
         logger.info("[client] start client id {} ......", clientId);
-        client.start(clientId);
+        client.start();
     }
 }

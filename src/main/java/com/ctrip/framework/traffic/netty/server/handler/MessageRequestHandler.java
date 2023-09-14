@@ -16,7 +16,7 @@ public class MessageRequestHandler extends SimpleChannelInboundHandler<MessageRe
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MessageRequestPacket messageRequestPacket) {
         MessageResponsePacket messageResponsePacket = new MessageResponsePacket();
-        logger.info("[server] received seq: {}", messageRequestPacket.getSeq());
+        logger.debug("[server] received seq: {}", messageRequestPacket.getSeq());
         messageResponsePacket.setSeq(messageRequestPacket.getSeq());
 
         ctx.channel().writeAndFlush(messageResponsePacket);

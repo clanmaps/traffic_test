@@ -1,5 +1,6 @@
 package com.ctrip.framework.traffic.netty.client;
 
+import com.ctrip.framework.traffic.controller.ClientVO;
 import com.ctrip.framework.traffic.netty.protocol.request.MessageRequestPacket;
 import com.ctrip.framework.traffic.netty.protocol.response.MessageResponsePacket;
 import com.ctrip.framework.traffic.utils.ThreadUtils;
@@ -24,42 +25,40 @@ public class MessageImpl implements Message {
     private final Logger delay = LoggerFactory.getLogger("delayLogger");
 
     private static final String _4B = "abcd";
+
     //one mysql rows_event max size is 8KB(2^10 * 2^6)
     private static final String _8KB = _4B.repeat((int) (Math.pow(2, 10) * 2));
+
+    //1Mb/8KB
+    private static double baseCountPer1Mb = Math.pow(2, 20) / Math.pow(2, 16);
+
     private static final int INIT = 2 * 1000;
 
     private List<MessageRequestPacket> requests = Lists.newArrayList();
     private Map<Integer, Entity> receivedMap = Maps.newConcurrentMap();
     private ScheduledExecutorService sendScheduledExecutor;
     private ExecutorService receivedExecutor;
+    private volatile boolean canReport = false;
 
     private int clientId;
     private int period;
-    private double roundCount;
+    private double countPerRound;
+    private int omit;
 
-    public MessageImpl(int bandWidth, int period, int clientId) {
+    public MessageImpl(ClientVO clientVO, int clientId) {
         this.clientId = clientId;
-        if (period / 100 > 0 && period / 100 <= 10) {
-            this.period = period / 100 * 100;
-        } else {
-            this.period = 200;
-        }
-        int round = 1000 / this.period;
-        this.roundCount = Math.pow(2, 20) / Math.pow(2, 16) / round;
-        if (bandWidth > 0 && bandWidth <= 1000) {
-            roundCount = roundCount * bandWidth;
-            logger.info("[client][{}] bandWidth size: {}Mbps, roundCount: {}, period: {}", clientId, bandWidth, roundCount, this.period);
-        } else {
-            logger.info("[client][{}] invalid bandWidth size: {}Mbps, use 1Mbps, roundCount: {}, period: {}", clientId, bandWidth, roundCount, this.period);
-        }
+        this.period = clientVO.getPeriod();
+        this.omit = clientVO.getPeriod();
+        int roundPerSecond = 1000 / period;
+        this.countPerRound = baseCountPer1Mb * clientVO.getBandWidth() / roundPerSecond;
     }
 
     @Override
     public void start() {
         sendScheduledExecutor = ThreadUtils.newSingleThreadScheduledExecutor("sender");
         receivedExecutor = ThreadUtils.newSingleThreadScheduledExecutor("receiver");
-        logger.info("[client][{}] start, send bits size: {}, roundCount: {}, period: {}", clientId, _8KB.getBytes().length * 8, roundCount, period);
-        for (int i = 0; i < roundCount; i++) {
+        logger.info("[client][{}] start, send bits size: {}, roundCount: {}, period: {}", clientId, _8KB.getBytes().length * 8, countPerRound, period);
+        for (int i = 0; i < countPerRound; i++) {
             MessageRequestPacket request = new MessageRequestPacket(i, _8KB);
             Entity entity = new Entity(true, 0);
             receivedMap.put(i, entity);
@@ -69,6 +68,10 @@ public class MessageImpl implements Message {
 
     @Override
     public void send(Channel channel) {
+        sendScheduledExecutor.schedule(() -> {
+            canReport = true;
+        }, omit, TimeUnit.SECONDS);
+
         sendScheduledExecutor.scheduleWithFixedDelay(() -> {
             long start = System.currentTimeMillis();
             int sendCount = 0;
@@ -100,7 +103,11 @@ public class MessageImpl implements Message {
             Entity entity = receivedMap.get(seq);
             entity.setReceived(true);
             long delayTime = System.currentTimeMillis() - entity.getSendTime();
-            delay.info("[{}]delay: {}ms", clientId, delayTime);
+            if (canReport) {
+                delay.info("[{}]delay: {}ms", clientId, delayTime);
+            } else {
+                logger.debug("[{}]warm up delay: {}ms", clientId, delayTime);
+            }
         });
     }
 
