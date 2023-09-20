@@ -6,12 +6,14 @@ import com.ctrip.framework.traffic.netty.protocol.response.MessageResponsePacket
 import com.ctrip.framework.traffic.utils.ThreadUtils;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.math.Stats;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -34,10 +36,13 @@ public class MessageImpl implements Message {
 
     private static final int INIT = 2 * 1000;
 
+    private ArrayBlockingQueue<Long> delayQueue = new ArrayBlockingQueue<>((int) Math.pow(2, 16));
+
     private List<MessageRequestPacket> requests = Lists.newArrayList();
     private Map<Integer, Entity> receivedMap = Maps.newConcurrentMap();
     private ScheduledExecutorService sendScheduledExecutor;
     private ExecutorService receivedExecutor;
+    private ScheduledExecutorService monitorExecutor;
     private volatile boolean canReport = false;
 
     private int clientId;
@@ -56,7 +61,8 @@ public class MessageImpl implements Message {
     @Override
     public void start() {
         sendScheduledExecutor = ThreadUtils.newSingleThreadScheduledExecutor("sender");
-        receivedExecutor = ThreadUtils.newSingleThreadScheduledExecutor("receiver");
+        receivedExecutor = ThreadUtils.newSingleThreadExecutor("receiver");
+        monitorExecutor = ThreadUtils.newSingleThreadScheduledExecutor("monitor");
         logger.info("[client][{}] start, send bits size: {}, roundCount: {}, period: {}", clientId, _8KB.getBytes().length * 8, countPerRound, period);
         for (int i = 0; i < countPerRound; i++) {
             MessageRequestPacket request = new MessageRequestPacket(i, _8KB);
@@ -94,6 +100,16 @@ public class MessageImpl implements Message {
             }
             logger.info("[client][{}] send cost: {} ms, count: {}", clientId, System.currentTimeMillis() - start, sendCount);
         }, INIT, period, TimeUnit.MILLISECONDS);
+
+        monitorExecutor.scheduleAtFixedRate(() -> {
+            List<Long> delayList = Lists.newArrayList();
+            int count = delayQueue.drainTo(delayList);
+            if (delayList.isEmpty()) {
+                return;
+            }
+            long avg = Math.round(Stats.meanOf(delayList));
+            delay.info("[{}],{},{}", clientId, avg, count);
+        }, omit, 1, TimeUnit.SECONDS);
     }
 
     @Override
@@ -104,7 +120,11 @@ public class MessageImpl implements Message {
             entity.setReceived(true);
             long delayTime = System.currentTimeMillis() - entity.getSendTime();
             if (canReport) {
-                delay.info("[{}]delay: {}ms", clientId, delayTime);
+                boolean ret = delayQueue.offer(delayTime);
+                if (!ret) {
+                    logger.warn("[{}]delay offer failed {}ms for full queue", clientId, delayTime);
+                }
+//                delay.info("[{}]delay: {}ms", clientId, delayTime);
             } else {
                 logger.debug("[{}]warm up delay: {}ms", clientId, delayTime);
             }
@@ -121,6 +141,11 @@ public class MessageImpl implements Message {
         if (receivedExecutor != null) {
             receivedExecutor.shutdownNow();
             receivedExecutor = null;
+        }
+
+        if (monitorExecutor != null) {
+            monitorExecutor.shutdownNow();
+            monitorExecutor = null;
         }
     }
 
