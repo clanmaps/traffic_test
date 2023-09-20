@@ -17,8 +17,8 @@ public class ClientVO {
     //default netty client number is 1
     private int parallel = 1;
 
-    //default warm up time is 60 seconds
-    private int omit = 60;
+    //default warm up time is 30 seconds
+    private int omit = 30;
 
     public String getServerHost() {
         return serverHost;

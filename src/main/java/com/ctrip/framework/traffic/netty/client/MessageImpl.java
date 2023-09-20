@@ -48,7 +48,7 @@ public class MessageImpl implements Message {
     public MessageImpl(ClientVO clientVO, int clientId) {
         this.clientId = clientId;
         this.period = clientVO.getPeriod();
-        this.omit = clientVO.getPeriod();
+        this.omit = clientVO.getOmit();
         int roundPerSecond = 1000 / period;
         this.countPerRound = baseCountPer1Mb * clientVO.getBandWidth() / roundPerSecond;
     }
