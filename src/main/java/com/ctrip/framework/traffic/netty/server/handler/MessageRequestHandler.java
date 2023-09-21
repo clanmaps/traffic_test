@@ -21,4 +21,16 @@ public class MessageRequestHandler extends SimpleChannelInboundHandler<MessageRe
 
         ctx.channel().writeAndFlush(messageResponsePacket);
     }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        logger.debug("[server] remote client connected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
+        ctx.fireChannelActive();
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        logger.debug("[server] remote client disconnected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
+        ctx.fireChannelInactive();
+    }
 }

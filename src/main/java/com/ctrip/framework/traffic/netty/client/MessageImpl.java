@@ -124,7 +124,7 @@ public class MessageImpl implements Message {
                 if (!ret) {
                     logger.warn("[{}]delay offer failed {}ms for full queue", clientId, delayTime);
                 }
-//                delay.info("[{}]delay: {}ms", clientId, delayTime);
+                delay.debug("[{}]delay: {}ms", clientId, delayTime);
             } else {
                 logger.debug("[{}]warm up delay: {}ms", clientId, delayTime);
             }
