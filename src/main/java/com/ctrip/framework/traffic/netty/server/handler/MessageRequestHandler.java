@@ -24,13 +24,13 @@ public class MessageRequestHandler extends SimpleChannelInboundHandler<MessageRe
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        logger.debug("[server] remote client connected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
+        logger.info("[server] remote client connected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
         ctx.fireChannelActive();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        logger.debug("[server] remote client disconnected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
+        logger.info("[server] remote client disconnected, {} -> {}", ctx.channel().remoteAddress(), ctx.channel().localAddress());
         ctx.fireChannelInactive();
     }
 }
