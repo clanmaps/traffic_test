@@ -8,6 +8,7 @@ import org.junit.Test;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -50,10 +51,10 @@ public class MessageImplTest {
 
     @Test
     public void testRetrans() throws IOException {
-        String filePath = "/Users/wjx/Downloads/flow/t_sha_sin/0924_result2.csv";
+        String filePath = "/Users/wjx/Downloads/flow/m_sha_sin/0922_result2.csv";
         BufferedReader in = new BufferedReader(new FileReader(filePath));
 
-        Map<Integer, String> portAndResult = Maps.newHashMap();
+        Map<Integer, List<RetransEntryPair>> portAndResults = Maps.newHashMap();
 
         String header = in.readLine();
         System.out.println(header);
@@ -61,29 +62,40 @@ public class MessageImplTest {
         int ignore = 0;
         int exception = 0;
         long count = 0;
+
         while ((str = in.readLine()) != null) {
             count++;
             String[] ret = str.split(",");
             String portStr = ret[1].trim();
             int port = Integer.parseInt(portStr);
+            List<RetransEntryPair> pairs = portAndResults.get(port);
 
-            String totalStr = ret[4].trim();
             try {
-                long total = Long.parseLong(totalStr);
-                long lastTotal = 0;
-                String lastStr = portAndResult.get(port);
-                if (lastStr != null) {
-                    lastTotal = Long.parseLong(lastStr.split(",")[4].trim());
-                }
+                long curTotalSend = Long.parseLong(ret[4].trim());
+                long curTotalRetrans = Long.parseLong(ret[2].trim());
+                RetransEntry curRetransEntry = new RetransEntry(curTotalSend, curTotalRetrans);
 
-                if (total < lastTotal) {
-                    ignore++;
-//                    System.out.println("ignore:");
-//                    System.out.println(str);
-                    continue;
-                }
+                if (pairs == null) {
+                    RetransEntry end = new RetransEntry(curTotalSend, curTotalRetrans);
+                    RetransEntryPair pair = new RetransEntryPair(curRetransEntry, end);
+                    pairs = Lists.newArrayList(pair);
+                    portAndResults.put(port, pairs);
+                } else {
+                    RetransEntryPair lastPair = pairs.get(pairs.size() - 1);
+                    long lastTotalSend = lastPair.getEnd().getTotalSend();
 
-                portAndResult.put(port, str);
+                    if (curTotalSend >= lastTotalSend) {
+                        lastPair.end.setTotalSend(curTotalSend);
+                        long lastTotalRetrans = lastPair.getEnd().getTotalRetrans();
+                        if (curTotalRetrans > lastTotalRetrans) {
+                            lastPair.end.setTotalRetrans(curTotalRetrans);
+                        }
+                    } else {
+                        RetransEntry end = new RetransEntry(curTotalSend, curTotalRetrans);
+                        RetransEntryPair pair = new RetransEntryPair(curRetransEntry, end);
+                        pairs.add(pair);
+                    }
+                }
             } catch (Exception e) {
                 exception++;
 //                System.out.println("error: " + e);
@@ -91,42 +103,20 @@ public class MessageImplTest {
             }
         }
 
-        int size = portAndResult.size();
-        long sumAvg = 0;
-        long max = 0;
-        long sumOver5 = 0;
-        long sumOver10 = 0;
-        long sumOver50 = 0;
-        long sumOver70 = 0;
+        int size = portAndResults.size();
+        long sumSend = 0;
+        long sumRetrans = 0;
+//        long sumOver5 = 0;
+//        long sumOver10 = 0;
+//        long sumOver50 = 0;
+//        long sumOver70 = 0;
 
-        for (String value : portAndResult.values()) {
-            String[] ret = value.split(",");
-//            System.out.println("fields: " + ret.length);
-            String avgRetransRate = ret[7];
-            long curAvg = Long.parseLong(avgRetransRate.trim());
-//            if (curAvg > 1000) {
-//                System.out.println(curAvg + " : " + value);
-//            }
-
-            sumAvg += curAvg;
-
-            String maxRetransRate = ret[8];
-            long curMax = Long.parseLong(maxRetransRate.trim());
-            if (curMax > max) {
-                max = curMax;
+        for (List<RetransEntryPair> value : portAndResults.values()) {
+            for (RetransEntryPair pair : value) {
+                sumSend += pair.getEnd().getTotalSend() - pair.getStart().getTotalSend();
+                sumRetrans += pair.getEnd().getTotalRetrans() - pair.getStart().getTotalRetrans();
             }
 
-            String retransRateOver5 = ret[9];
-            sumOver5 += Long.parseLong(retransRateOver5.trim());
-
-            String retransRateOver10 = ret[10];
-            sumOver10 += Long.parseLong(retransRateOver10.trim());
-
-            String retransRateOver50 = ret[11];
-            sumOver50 += Long.parseLong(retransRateOver50.trim());
-
-            String retransRateOver70 = ret[12];
-            sumOver70 += Long.parseLong(retransRateOver70.trim());
         }
 
         System.out.println("end-----------");
@@ -134,12 +124,72 @@ public class MessageImplTest {
         System.out.println("size: " + size);
         System.out.println("ignore: " + ignore);
         System.out.println("exception: " + exception);
-        System.out.println("max: " + max);
-        System.out.println("avg: " + sumAvg / size);
-        System.out.println("5: " + sumOver5 / 80);
-        System.out.println("10: " + sumOver10 / 80);
-        System.out.println("50: " + sumOver50 / 80);
-        System.out.println("70: " + sumOver70 / 80);
+//        System.out.println("max: " + max);
+        System.out.println("sumRetrans: " + sumRetrans);
+        System.out.println("sumSend: " + sumSend);
+        double avg = (double) sumRetrans / sumSend;
+        System.out.println("avg: " + avg);
 
+        BigDecimal avg2 = BigDecimal.valueOf(sumRetrans)
+                .divide(BigDecimal.valueOf(sumSend), 8, BigDecimal.ROUND_HALF_UP);
+
+        System.out.println("avg2: " + avg2);
+//        System.out.println("5: " + sumOver5 / 80);
+//        System.out.println("10: " + sumOver10 / 80);
+//        System.out.println("50: " + sumOver50 / 80);
+//        System.out.println("70: " + sumOver70 / 80);
+
+    }
+
+    static class RetransEntryPair {
+        private RetransEntry start;
+        private RetransEntry end;
+
+        public RetransEntryPair(RetransEntry start, RetransEntry end) {
+            this.start = start;
+            this.end = end;
+        }
+
+        public RetransEntry getStart() {
+            return start;
+        }
+
+        public void setStart(RetransEntry start) {
+            this.start = start;
+        }
+
+        public RetransEntry getEnd() {
+            return end;
+        }
+
+        public void setEnd(RetransEntry end) {
+            this.end = end;
+        }
+    }
+
+    static class RetransEntry {
+        private long totalSend;
+        private long totalRetrans;
+
+        public RetransEntry(long totalSend, long totalRetrans) {
+            this.totalSend = totalSend;
+            this.totalRetrans = totalRetrans;
+        }
+
+        public long getTotalSend() {
+            return totalSend;
+        }
+
+        public void setTotalSend(long totalSend) {
+            this.totalSend = totalSend;
+        }
+
+        public long getTotalRetrans() {
+            return totalRetrans;
+        }
+
+        public void setTotalRetrans(long totalRetrans) {
+            this.totalRetrans = totalRetrans;
+        }
     }
 }
